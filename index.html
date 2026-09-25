@@ -9,13 +9,14 @@
     * { box-sizing: border-box; }
 
     :root{
-      --bg:#0e1220;
-      --text:#eaeaf0;
-      --muted:#cdd3ff;
-      --card:#161a2b;
-      --border:#d7dbe0;
-      --primary:#4d7cff;
-      --shadow: 0 18px 50px rgba(0,0,0,.45);
+      --bg:#fbf1ee;
+      --text:#5e3a3a;
+      --muted:#8a6a68;
+      --card:#ffffff;
+      --border:#f2d3d1;
+      --primary:#c8484a;
+      --primary-dark:#a83a3e;
+      --shadow: 0 20px 50px rgba(90,30,30,.14);
       --radius: 18px;
     }
 
@@ -23,7 +24,7 @@
       font-family: Arial, sans-serif;
       margin:0;
       color: var(--text);
-      background: radial-gradient(circle at top, rgba(47,67,120,.38), transparent 38%), var(--bg);
+      background: radial-gradient(circle at top, rgba(200,72,74,.12), transparent 45%), var(--bg);
     }
 
     .wrap{
@@ -58,7 +59,8 @@
       border-radius: var(--radius);
       padding: 32px;
       box-shadow: var(--shadow);
-      border: 1px solid rgba(0,0,0,.04);
+      border: 1px solid var(--border);
+      border-top: 6px solid var(--primary);
     }
 
     .title{
@@ -83,6 +85,7 @@
       line-height: 1.1;
       margin:0;
       letter-spacing: -0.2px;
+      color: var(--primary-dark);
     }
 
     p{
@@ -114,7 +117,7 @@
       border-radius: 12px;
       outline:none;
       background:#fff;
-      color:#111;
+      color:#3d2a2a;
       font-family: Arial, sans-serif;
     }
 
@@ -126,13 +129,13 @@
 
     input::placeholder,
     textarea::placeholder{
-      color:#777;
+      color:#b09a98;
     }
 
     input:focus,
     textarea:focus{
-      border-color:#6aa5ff;
-      box-shadow:0 0 0 4px rgba(106,165,255,.22);
+      border-color:#e08a88;
+      box-shadow:0 0 0 4px rgba(224,138,136,.2);
     }
 
     button{
@@ -144,7 +147,7 @@
       border:0;
       border-radius: 12px;
       cursor:pointer;
-      background: var(--primary);
+      background: linear-gradient(135deg, #d9595a, #b9403f);
       color:#fff;
       transition: transform .04s ease, opacity .2s ease, filter .2s ease;
     }
@@ -170,8 +173,8 @@
       text-align:center;
     }
 
-    .ok{ color:#4ade80; }
-    .err{ color:#f87171; }
+    .ok{ color:#2f8a55; }
+    .err{ color:#c0392b; }
 
     /* ===== Pesquisa de satisfação (tema claro e aconchegante) ===== */
     .popup-overlay{
@@ -786,6 +789,26 @@
       }));
     }
 
+    // O Apps Script às vezes devolve 404/5xx de forma intermitente; tenta de novo antes de mostrar erro.
+    async function buscarComRetentativa(url, opcoes, tentativas = 3){
+      for (let i = 1; i <= tentativas; i++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+        try {
+          const resp = await fetch(url, { ...opcoes, signal: controller.signal });
+          const falhaTemporaria = resp.status === 404 || resp.status >= 500;
+          if (!falhaTemporaria || i === tentativas) return resp;
+        } catch (err) {
+          if (i === tentativas) throw err;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
+        await new Promise(r => setTimeout(r, 800 * i));
+      }
+    }
+
     function ehNaoCadastrado(msg){
       const m = String(msg || '')
         .toLowerCase()
@@ -902,17 +925,13 @@
       mostrar('Validando...', 'ok');
       $btn.disabled = true;
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
       try {
         const payload = JSON.stringify({ cnpj });
 
-        const resp = await fetch(APP_SCRIPT_URL, {
+        const resp = await buscarComRetentativa(APP_SCRIPT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: payload,
-          signal: controller.signal
+          body: payload
         });
 
         if (!resp.ok) {
@@ -956,7 +975,6 @@
         }
         return mostrar(MSG_ERRO_GENERICO, 'err');
       } finally {
-        clearTimeout(timeoutId);
         $btn.disabled = false;
       }
     });
